@@ -13,7 +13,7 @@ type Config struct {
 
 // It returns the first IP for a given network interface
 func (c *AgentConfig) GetIpByInterface() (string, error) {
-	fmt.Println("valor dentro GetIpByInterface:", c.Interface)
+	fmt.Println("GetIpByInterface:", c.Interface)
 	i, err := net.InterfaceByName(c.Interface)
 	if err != nil {
 		log.Errorf("Erro getting IP address: %v", err)
@@ -37,7 +37,7 @@ func (c *AgentConfig) GetIpByInterface() (string, error) {
 }
 
 func (c *Config) GetIpByInterface() (string, error) {
-	fmt.Println("valor dentro GetIpByInterface:", c.Interface)
+	fmt.Println("GetIpByInterface:", c.Interface)
 	i, err := net.InterfaceByName(c.Interface)
 	if err != nil {
 		log.Errorf("Erro getting IP address: %v", err)
