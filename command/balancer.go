@@ -1,28 +1,14 @@
-// Copyright © 2016 NAME HERE <EMAIL ADDRESS>
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package command
 
 import (
 	log "github.com/Sirupsen/logrus"
 
-	"os"
-
-	"github.com/google/seesaw/ipvs"
 	"github.com/luizbafilho/fusis/api"
+	"github.com/luizbafilho/fusis/config"
 	"github.com/luizbafilho/fusis/fusis"
+	"github.com/luizbafilho/fusis/net"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var balancerCmd = &cobra.Command{
@@ -33,22 +19,33 @@ var balancerCmd = &cobra.Command{
 It's responsible for creating new Services and watching for Agents joining the cluster,
 and add routes to them in the Load Balancer.`,
 	Run: run,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		viper.Unmarshal(&config.Balancer)
+	},
 }
 
 func init() {
-	balancerCmd.Flags().StringVarP(&fusisConfig.Interface, "iface", "", "eth0", "Network interface")
 	FusisCmd.AddCommand(balancerCmd)
+	setupBalancerConfig()
+}
+
+func setupBalancerConfig() {
+	balancerCmd.Flags().StringVarP(&config.Balancer.Interface, "interface", "", "eth0", "Network interface")
+	balancerCmd.Flags().StringVarP(&config.Balancer.Join, "join", "j", "", "Join balancer pool")
+	balancerCmd.Flags().BoolVarP(&config.Balancer.Single, "single", "s", false, "Configuration directory")
+	balancerCmd.Flags().StringVarP(&config.Balancer.ConfigPath, "config-path", "", "/etc/fusis", "Configuration directory")
+	balancerCmd.Flags().IntVar(&config.Balancer.RaftPort, "raft-port", 4382, "Raft port")
+
+	err := viper.BindPFlags(balancerCmd.Flags())
+	if err != nil {
+		log.Errorf("error binding pflags: %v", err)
+	}
 }
 
 func run(cmd *cobra.Command, args []string) {
-	if err := ipvs.Init(); err != nil {
-		log.Fatalf("IPVS initialisation failed: %v", err)
-	}
-	log.Printf("IPVS version %s", ipvs.Version())
-
-	env := os.Getenv("FUSIS_ENV")
-	if env == "" {
-		env = "development"
+	if err := net.SetIpForwarding(); err != nil {
+		log.Warn("Fusis couldn't set net.ipv4.ip_forward=1")
+		log.Fatal(err)
 	}
 
 	balancer, err := fusis.NewBalancer()
@@ -56,13 +53,12 @@ func run(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	err = balancer.Start(fusisConfig)
-	if err != nil {
-		panic(err)
+	if config.Balancer.Join != "" {
+		balancer.JoinPool()
 	}
 
-	apiService := api.NewAPI(env)
+	apiService := api.NewAPI(balancer)
 	go apiService.Serve()
 
-	waitSignals()
+	waitSignals(balancer)
 }

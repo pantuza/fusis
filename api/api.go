@@ -1,21 +1,33 @@
 package api
 
-import "github.com/gin-gonic/gin"
+import (
+	"os"
 
+	"github.com/gin-gonic/gin"
+	"github.com/luizbafilho/fusis/fusis"
+)
+
+// ApiService ...
 type ApiService struct {
-	router *gin.Engine
-	env    string
+	balancer *fusis.Balancer
+	router   *gin.Engine
+	env      string
 }
 
-func NewAPI(env string) ApiService {
+//NewAPI ...
+func NewAPI(balancer *fusis.Balancer) ApiService {
+	gin.SetMode(gin.ReleaseMode)
+
 	return ApiService{
-		router: gin.Default(),
-		env:    env,
+		balancer: balancer,
+		router:   gin.Default(),
+		env:      getEnv(),
 	}
 }
 
 func (as ApiService) Serve() {
 	as.router.GET("/services", as.serviceList)
+	as.router.GET("/services/:service_id", as.serviceGet)
 	as.router.POST("/services", as.serviceCreate)
 	as.router.DELETE("/services/:service_id", as.serviceDelete)
 
@@ -25,6 +37,13 @@ func (as ApiService) Serve() {
 	if as.env == "test" {
 		as.router.POST("/flush", as.flush)
 	}
+	as.router.Run("0.0.0.0:8000")
+}
 
-	as.router.Run(":8000")
+func getEnv() string {
+	env := os.Getenv("FUSIS_ENV")
+	if env == "" {
+		env = "development"
+	}
+	return env
 }

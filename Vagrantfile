@@ -7,12 +7,13 @@
 # you're doing.
 Vagrant.configure(2) do |config|
   config.ssh.forward_x11 = true
+  config.ssh.forward_agent = true
 
   config.vm.network "forwarded_port", guest: 8000, host: 8000
 
   config.vm.network "private_network", ip: "192.168.33.10"
 
-  config.vm.synced_folder ENV['GOPATH'], "/home/vagrant/gocode"
+  config.vm.synced_folder ENV['GOPATH'], "/home/vagrant/gocode", type: "nfs"
 
   config.vm.provider "vmware_fusion" do |provider, override|
     override.vm.box = "geerlingguy/ubuntu1404"
@@ -82,6 +83,6 @@ Vagrant.configure(2) do |config|
 
 
     echo "====> Config autojump"
-    echo 'source /usr/share/autojump/autojump.sh' >> $HOME/.bash_profile
+    echo 'source /usr/share/autojump/autojump.sh' >> $HOME/.bashrc
   SHELL
 end

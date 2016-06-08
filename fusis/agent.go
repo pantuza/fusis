@@ -3,17 +3,18 @@ package fusis
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/hashicorp/serf/serf"
-	"github.com/luizbafilho/fusis/engine"
+	"github.com/luizbafilho/fusis/config"
+	"github.com/luizbafilho/fusis/ipvs"
 )
 
 type Agent struct {
 	serf *serf.Serf
 	// eventCh is used for Serf to deliver events on
 	eventCh chan serf.Event
-	config  *AgentConfig
+	config  *config.AgentConfig
 }
 
-func NewAgent(config *AgentConfig) (*Agent, error) {
+func NewAgent(config *config.AgentConfig) (*Agent, error) {
 	log.Infof("Fusis Agent: Config ==> %+v", config)
 	agent := &Agent{
 		eventCh: make(chan serf.Event, 64),
@@ -21,6 +22,12 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 	}
 
 	return agent, nil
+}
+
+func (a *Agent) Shutdown() {
+	if err := a.serf.Leave(); err != nil {
+		log.Fatalf("Graceful shutdown failed", err)
+	}
 }
 
 func (a *Agent) Join(existing []string, ignoreOld bool) (n int, err error) {
@@ -91,7 +98,7 @@ func (a *Agent) broadcastToBalancers() {
 		host = a.config.Host
 	}
 
-	dst := engine.Destination{
+	dst := ipvs.Destination{
 		Name:      a.config.Name,
 		Host:      host,
 		Port:      a.config.Port,
